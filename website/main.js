@@ -1,3 +1,5 @@
+import * as socket from "./socket.js"
+
 const store = {
   apiUrl: "127.0.0.1:5000",
   html: {
@@ -6,17 +8,17 @@ const store = {
     roomCreateFormStatus: document.getElementById("room-create-form-status"),
     roomList: document.getElementById("room-list"),
     roomsSection: document.getElementById("rooms-section"),
+    sendMessageForm: document.getElementById("send-message-form"),
   },
   room: {
     id: null,
-    socket: null,
   },
 }
 
 main()
 
 function main() {
-  const { roomCreateForm } = store.html
+  const { roomCreateForm, sendMessageForm } = store.html
 
   loadRooms()
 
@@ -27,6 +29,15 @@ function main() {
     const data = Object.fromEntries(formData.entries())
 
     createRoom(data)
+  })
+
+  sendMessageForm.addEventListener("submit", event => {
+    event.preventDefault()
+
+    const formData = new FormData(event.target)
+    const { type, payload } = Object.fromEntries(formData.entries())
+
+    socket.sendEvent(type, payload)
   })
 }
 
@@ -101,31 +112,11 @@ function createRoomListElement(room) {
 }
 
 function joinRoom(roomId) {
-  store.room.id = roomId
-  store.html.activeRoomId.innerHTML = roomId
-  openSocket()
-}
-
-function openSocket() {
   const { apiUrl } = store
 
-  const socket = new WebSocket(`ws://${apiUrl}/rooms/ws`)
+  store.room.id = roomId
+  store.html.activeRoomId.innerHTML = roomId
 
-  socket.onopen = () => {
-    socket.send({ data: "Yello from the client!" })
-  }
-
-  socket.onclose = () => {
-    socket.send("Until next time!")
-  }
-
-  socket.onmessage = event => {
-    console.log(event.data)
-  }
-
-  socket.onerror = error => {
-    console.log("Socker error:", error)
-  }
-
-  store.room.socket = socket
+  socket.connect(apiUrl)
 }
+

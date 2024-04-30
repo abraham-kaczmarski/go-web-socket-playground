@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	pongWait     = 10 * time.Second
-	pingInterval = pongWait * 9 / 10
+	pingInterval = 10 * time.Second
+	pongWait     = 12 * time.Second
 )
 
 type clientList map[*Client]bool
@@ -30,10 +30,12 @@ func NewClient(conn *websocket.Conn, mgr *ClientManager) *Client {
 }
 
 func (c *Client) HandleConnection() {
-	c.readMessages()
+	go c.readMessages()
+	go c.writeMessages()
 }
 
 func (c *Client) handlePong(message string) error {
+	// log.Println("pong")
 	return c.connection.SetReadDeadline((time.Now().Add(pongWait)))
 }
 
@@ -84,7 +86,7 @@ func (c *Client) writeMessages() {
 
 	for {
 		select {
-		case message, ok := <-c.egress:
+		case event, ok := <-c.egress:
 			if !ok {
 				if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
 					log.Println("connection closed: ", err)
@@ -92,17 +94,18 @@ func (c *Client) writeMessages() {
 				return
 			}
 
-			data, err := json.Marshal(message)
+			// data, err := json.Marshal(event)
 
-			if err != nil {
-				log.Println(err)
-				continue
-			}
+			// if err != nil {
+			// 	log.Println(err)
+			// 	continue
+			// }
 
-			if err := c.connection.WriteMessage(websocket.TextMessage, data); err != nil {
+			if err := c.connection.WriteMessage(websocket.TextMessage, event); err != nil {
 				log.Println(err)
 			}
 		case <-ticker.C:
+			// log.Println("ping")
 			if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				log.Println("writemsg: ", err)
 				return

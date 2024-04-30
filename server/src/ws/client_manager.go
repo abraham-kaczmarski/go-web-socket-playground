@@ -1,8 +1,9 @@
 package ws
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
+	"log"
 	"sync"
 )
 
@@ -19,7 +20,8 @@ type ClientManager struct {
 
 func NewClientManager() *ClientManager {
 	m := &ClientManager{
-		clients: make(clientList),
+		clients:  make(clientList),
+		handlers: make(map[string]EventHandler),
 	}
 
 	m.setUpEventHandlers()
@@ -35,8 +37,36 @@ func (m *ClientManager) AddClient(c *Client) {
 }
 
 func (m *ClientManager) setUpEventHandlers() {
-	m.handlers[EventSendMessage] = func(e Event, c *Client) error {
-		fmt.Println(e)
+	m.handlers[EventAuthenticate] = func(e Event, c *Client) error {
+		var payload EventPayloadAuthenticate
+
+		if err := json.Unmarshal(e.Payload, &payload); err != nil {
+			return errors.New("error marshaling payload of type '" + e.Type + "'")
+		}
+
+		log.Printf("connection authenticated as %s:%s", payload.Id, payload.Secret)
+		return nil
+	}
+
+	m.handlers[EventTest] = func(e Event, c *Client) error {
+		var payload EventPayloadText
+
+		if err := json.Unmarshal(e.Payload, &payload); err != nil {
+			return errors.New("error marshaling payload of type '" + e.Type + "'")
+		}
+
+		log.Printf("test message received: %s", payload)
+
+		response := GenericEvent[string]{Type: "test_response", Payload: string(payload)}
+		data, err := json.Marshal(response)
+
+		if err != nil {
+			log.Println(err)
+			return errors.New("error marshaling response")
+		}
+
+		c.egress <- data
+
 		return nil
 	}
 }
